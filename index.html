@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liquid Glass Web — 苹果液态流动玻璃交互工坊</title>
+  <style>
+    :root {
+      --bg-theme: radial-gradient(circle at 20% 20%, #1e1b4b 0%, #0f172a 50%, #030712 100%);
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --glass-tint: rgba(255, 255, 255, 0.1);
+      --glass-border: rgba(255, 255, 255, 0.28);
+      --glass-highlight: rgba(255, 255, 255, 0.55);
+      --glass-blur: 0.5px;
+      --refract-scale: 55;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg-theme);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+      transition: background 0.6s ease;
+    }
+
+    /* 背景装饰层：网格与渐变球，用于体现极致折射 */
+    .bg-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .bg-grid {
+      position: absolute;
+      inset: 0;
+      background-size: 40px 40px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+      mask-image: radial-gradient(circle at 50% 50%, black 40%, transparent 85%);
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.6;
+      animation: float 14s infinite alternate ease-in-out;
+    }
+    .orb-1 { width: 420px; height: 420px; background: #6366f1; top: 10%; left: 15%; }
+    .orb-2 { width: 360px; height: 360px; background: #ec4899; bottom: 15%; right: 10%; animation-duration: 18s; }
+    .orb-3 { width: 300px; height: 300px; background: #06b6d4; top: 40%; right: 35%; animation-duration: 22s; }
+
+    @keyframes float {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(60px, 40px) scale(1.15); }
+    }
+
+    /* 顶栏控制台 */
+    header {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 32px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+      font-size: 18px;
+    }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .brand-badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 20px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    /* 场景与背景切换标签 */
+    .bg-selector {
+      display: flex;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .bg-btn {
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-sub);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .bg-btn.active, .bg-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    /* 主舞台布局 */
+    main {
+      position: relative;
+      z-index: 5;
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 32px;
+    }
+
+    /* 展厅区域 */
+    .stage {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .hero-card {
+      position: relative;
+      padding: 44px;
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .hero-card h1 {
+      font-size: 40px;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #ffffff 30%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-card p {
+      font-size: 16px;
+      color: var(--text-sub);
+      line-height: 1.6;
+      max-width: 620px;
+      margin-bottom: 24px;
+      user-select: text;
+    }
+
+    .code-pill {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #38bdf8;
+      display: inline-block;
+      user-select: text;
+    }
+
+    /* 物理交互演示区 */
+    .interactive-arena {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    .arena-box {
+      padding: 28px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .arena-box h3 {
+      font-size: 17px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* 果冻物理按钮群 */
+    .jelly-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      padding: 10px 0;
+    }
+
+    .jelly-btn {
+      position: relative;
+      padding: 14px 28px;
+      border-radius: 100px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-tint);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: grab;
+      backdrop-filter: blur(8px);
+      box-shadow: 
+        0 8px 24px rgba(0, 0, 0, 0.25),
+        inset 0 1px 2px var(--glass-highlight),
+        inset 0 -8px 16px rgba(0, 0, 0, 0.2);
+      transition: transform 0.08s ease, box-shadow 0.2s ease;
+      touch-action: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .jelly-btn:active {
+      cursor: grabbing;
+      box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.35),
+        inset 0 2px 4px var(--glass-highlight),
+        inset 0 -12px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .jelly-btn-primary {
+      background: rgba(56, 189, 248, 0.18);
+      border-color: rgba(56, 189, 248, 0.45);
+      box-shadow: 
+        0 8px 28px rgba(56, 189, 248, 0.3),
+        inset 0 1px 2px rgba(255, 255, 255, 0.8),
+        inset 0 -8px 16px rgba(14, 116, 144, 0.4);
+    }
+
+    /* 右侧参数调节面板 */
+    .controls-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .card-panel {
+      padding: 24px;
+      border-radius: 24px;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .panel-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--text-sub);
+    }
+    .slider-val {
+      color: #38bdf8;
+      font-family: monospace;
+      font-weight: 600;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.12);
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+      transition: transform 0.1s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    /* 浮动液态玻璃透镜 (核心主角) */
+    #glassLens {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 320px;
+      height: 200px;
+      border-radius: 40px;
+      z-index: 1000;
+      cursor: grab;
+      touch-action: none;
+      backdrop-filter: url(#lensFilter) blur(var(--glass-blur)) contrast(1.18) brightness(1.06) saturate(1.15);
+      box-shadow: 
+        0 24px 60px rgba(0, 0, 0, 0.45),
+        0 4px 12px rgba(0, 0, 0, 0.25),
+        inset 0 1px 2px rgba(255, 255, 255, 0.8),
+        inset 0 -12px 24px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+      pointer-events: auto;
+      transition: border-radius 0.2s ease, width 0.2s ease, height 0.2s ease;
+    }
+
+    #glassLens:active {
+      cursor: grabbing;
+      box-shadow: 
+        0 14px 35px rgba(0, 0, 0, 0.5),
+        inset 0 2px 4px rgba(255, 255, 255, 0.9),
+        inset 0 -16px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .lens-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+    .lens-tag {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      backdrop-filter: blur(10px);
+    }
+    .lens-drag-hint {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .lens-content {
+      pointer-events: none;
+    }
+    .lens-content h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    .lens-content p {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.85);
+      text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+
+    /* 底部提示卡片 */
+    .tip-card {
+      margin-top: 16px;
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      font-size: 13px;
+      line-height: 1.5;
+      color: #bae6fd;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+      .interactive-arena {
+        grid-template-columns: 1fr;
+      }
+      #glassLens {
+        width: 280px;
+        height: 180px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 动态折射 SVG 滤镜系统 (核心数学折射管道) -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="position: fixed; width: 0; height: 0; pointer-events: none; z-index: -1;">
+    <defs>
+      <filter id="lensFilter" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
+        <!-- 动态 SDF 位移贴图输入通道 -->
+        <feImage id="feDisplacementImage" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" />
+        <!-- 像素级双向位移折射驱动 -->
+        <feDisplacementMap in="SourceGraphic" in2="feDisplacementImage" scale="55" xChannelSelector="R" yChannelSelector="G" result="refracted" />
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- 隐藏的位移贴图渲染画布 -->
+  <canvas id="displacementCanvas" style="display: none;"></canvas>
+
+  <!-- 背景粒子与几何网格 -->
+  <div class="bg-canvas">
+    <div class="bg-grid"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <!-- 顶栏导航 -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">🫧</div>
+      <div class="brand-title">Liquid Glass Web</div>
+      <div class="brand-badge">SDF + WebGL-Free</div>
+    </div>
+    <div class="bg-selector">
+      <button class="bg-btn active" data-bg="aurora">🌌 极光夜幕</button>
+      <button class="bg-btn" data-bg="tang">👑 大唐金阙</button>
+      <button class="bg-btn" data-bg="cyber">⚡ 赛博霓虹</button>
+      <button class="bg-btn" data-bg="minimal">📐 几何网格</button>
+    </div>
+  </header>
+
+  <!-- 主体交互展区 -->
+  <main>
+    <div class="stage">
+      <!-- 英雄视差展示卡 -->
+      <div class="hero-card">
+        <h1>真实光线折射 · 活体 DOM 透镜</h1>
+        <p>
+          本页面彻底告别死板的静态毛玻璃。透过这块玻璃透镜，底层的文字依然<b>可以自由选中</b>，按钮依然<b>可以实时点击</b>，后面的渐变与动效以物理折射率实时弯曲。
+        </p>
+        <div>
+          <span class="code-pill">backdrop-filter: url(#lensFilter)</span>
+          <span class="code-pill">SDF Displacement Map</span>
+          <span class="code-pill">零外部依赖 / 纯单文件</span>
+        </div>
+      </div>
+
+      <!-- 果冻按压与力学交互区 -->
+      <div class="interactive-arena">
+        <div class="arena-box">
+          <h3>🫳 果冻弹性物理按钮 (Jelly Press)</h3>
+          <p style="font-size: 13px; color: var(--text-sub);">
+            尝试按住并朝不同方向微微拖拽按钮，按钮会朝鼠标反向局部膨胀，松手带有真实弹簧振荡阻尼：
+          </p>
+          <div class="jelly-group">
+            <button class="jelly-btn jelly-btn-primary" id="jelly1">
+              <span>✨ 启元灵镜</span>
+            </button>
+            <button class="jelly-btn" id="jelly2">
+              <span>🌊 水滴回弹</span>
+            </button>
+            <button class="jelly-btn" id="jelly3">
+              <span>🫧 深度浮力</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="arena-box">
+          <h3>🌟 透镜下的密集文字与排印测试</h3>
+          <p style="font-size: 13px; color: var(--text-sub); line-height: 1.6; user-select: text;">
+            把浮动玻璃透镜拖拽到这段文字上方，观察边缘的<b>RGB色散</b>与<b>内缩弧形折射弯曲</b>效果：<br>
+            <i>“大唐启元盛世，镇国灵鲸出没于沧溟之底，吸纳八荒灵算，化作赛博琉璃。”</i><br>
+            文字透过玻璃中心保持清晰阅读，而在靠近边框 15% 区域被剧烈弯折。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧参数调优面板 -->
+    <div class="controls-panel">
+      <div class="card-panel">
+        <div class="panel-title">🎛️ 光学参数实时调节</div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>折射位移强度 (Scale)</span>
+            <span class="slider-val" id="valScale">55</span>
+          </div>
+          <input type="range" id="sliderScale" min="0" max="120" value="55">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>透镜圆角曲率 (Radius)</span>
+            <span class="slider-val" id="valRadius">40px</span>
+          </div>
+          <input type="range" id="sliderRadius" min="10" max="100" value="40">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>玻璃尺寸 (Size)</span>
+            <span class="slider-val" id="valSize">320 × 200</span>
+          </div>
+          <input type="range" id="sliderSize" min="200" max="440" value="320">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>边缘柔和虚化 (Blur)</span>
+            <span class="slider-val" id="valBlur">0.5px</span>
+          </div>
+          <input type="range" id="sliderBlur" min="0" max="10" step="0.5" value="0.5">
+        </div>
+
+        <div class="tip-card">
+          💡 <b>交互指引</b>：<br>
+          按住画面中央的<b>【透镜卡片】</b>可以全屏自由拖拽。当它划过文字、按钮和背景光球时，感受如同真实凸透镜般的流体折射！
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 浮动液态玻璃透镜实体 (主角) -->
+  <div id="glassLens">
+    <div class="lens-header">
+      <span class="lens-tag">Liquid Glass</span>
+      <span class="lens-drag-hint">✥ 按住拖拽</span>
+    </div>
+    <div class="lens-content">
+      <h2>液态流动透镜</h2>
+      <p>SDF 实时物理折射场 · 边缘色差光晕</p>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. SDF 数学与位移贴图生成引擎 (零依赖纯原生实现) ---
+    const canvas = document.getElementById('displacementCanvas');
+    const ctx = canvas.getContext('2d');
+    const feDisplacementImage = document.getElementById('feDisplacementImage');
+    const lensFilter = document.getElementById('lensFilter');
+    const glassLens = document.getElementById('glassLens');
+
+    let lensWidth = 320;
+    let lensHeight = 200;
+    let lensRadius = 40;
+    let refractScale = 55;
+
+    function smoothStep(a, b, t) {
+      t = Math.max(0, Math.min(1, (t - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    }
+
+    function roundedRectSDF(x, y, w, h, r) {
+      const qx = Math.abs(x) - w + r;
+      const qy = Math.abs(y) - h + r;
+      return Math.min(Math.max(qx, qy), 0) + Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) - r;
+    }
+
+    // 重新计算并烘焙 SDF Displacement Map
+    function updateDisplacementMap() {
+      const w = Math.round(lensWidth);
+      const h = Math.round(lensHeight);
+      canvas.width = w;
+      canvas.height = h;
+
+      const imgData = ctx.createImageData(w, h);
+      const data = imgData.data;
+
+      const aspect = w / h;
+      const rx = (w / Math.max(w, h)) * 0.5;
+      const ry = (h / Math.max(w, h)) * 0.5;
+      const normRadius = (lensRadius / Math.max(w, h)) * 0.5;
+
+      let idx = 0;
+      for (let y = 0; y < h; y++) {
+        const ny = (y / h - 0.5) * (h / Math.max(w, h));
+        for (let x = 0; x < w; x++) {
+          const nx = (x / w - 0.5) * (w / Math.max(w, h));
+
+          // 核心 SDF：距圆角矩形边界的无向物理距离
+          const dist = roundedRectSDF(nx, ny, rx, ry, normRadius);
+          
+          // 折射权重场：中心为 0（平坦完全不失真），边缘产生强烈渐变弯折
+          const borderBand = 0.08;
+          const factor = smoothStep(-borderBand, 0.005, dist);
+
+          // 沿法线方向计算像素偏移
+          const angle = Math.atan2(ny, nx);
+          const dx = Math.cos(angle) * factor * 0.5;
+          const dy = Math.sin(angle) * factor * 0.5;
+
+          // 映射到 RGBA 贴图（R 对应 X 轴偏移，G 对应 Y 轴偏移，128 为中性零偏移）
+          data[idx]     = Math.floor((dx + 0.5) * 255); // R
+          data[idx + 1] = Math.floor((dy + 0.5) * 255); // G
+          data[idx + 2] = 128;                          // B
+          data[idx + 3] = 255;                          // A
+          idx += 4;
+        }
+      }
+
+      ctx.putImageData(imgData, 0, 0);
+
+      // 导出为内联 DataURL 并挂载到 feImage
+      const dataUrl = canvas.toDataURL('image/png');
+      feDisplacementImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', dataUrl);
+      feDisplacementImage.setAttribute('href', dataUrl);
+      
+      const dispMap = lensFilter.querySelector('feDisplacementMap');
+      dispMap.setAttribute('scale', refractScale.toString());
+    }
+
+    // --- 2. 自由拖拽与边界物理吸附 ---
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let lensStartX = 0;
+    let lensStartY = 0;
+
+    glassLens.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      glassLens.setPointerCapture(e.pointerId);
+      const rect = glassLens.getBoundingClientRect();
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      lensStartX = rect.left;
+      lensStartY = rect.top;
+      glassLens.style.transform = 'none';
+      glassLens.style.left = lensStartX + 'px';
+      glassLens.style.top = lensStartY + 'px';
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+
+      let targetX = lensStartX + dx;
+      let targetY = lensStartY + dy;
+
+      // 视口边界约束
+      const margin = 10;
+      targetX = Math.max(margin, Math.min(window.innerWidth - lensWidth - margin, targetX));
+      targetY = Math.max(margin, Math.min(window.innerHeight - lensHeight - margin, targetY));
+
+      glassLens.style.left = targetX + 'px';
+      glassLens.style.top = targetY + 'px';
+    });
+
+    window.addEventListener('pointerup', () => {
+      isDragging = false;
+    });
+
+    // --- 3. 果冻按钮物理动力学 (Jelly Press Spring) ---
+    document.querySelectorAll('.jelly-btn').forEach(btn => {
+      let isPressed = false;
+      let startX = 0, startY = 0;
+
+      btn.addEventListener('pointerdown', (e) => {
+        isPressed = true;
+        btn.setPointerCapture(e.pointerId);
+        const rect = btn.getBoundingClientRect();
+        startX = e.clientX - rect.left - rect.width / 2;
+        startY = e.clientY - rect.top - rect.height / 2;
+        btn.style.transform = `scale(0.92, 0.94) translate(${startX * 0.15}px, ${startY * 0.15}px)`;
+      });
+
+      btn.addEventListener('pointermove', (e) => {
+        if (!isPressed) return;
+        const rect = btn.getBoundingClientRect();
+        const offsetX = (e.clientX - rect.left - rect.width / 2) * 0.2;
+        const offsetY = (e.clientY - rect.top - rect.height / 2) * 0.2;
+        btn.style.transform = `scale(0.94, 0.96) translate(${offsetX}px, ${offsetY}px)`;
+      });
+
+      btn.addEventListener('pointerup', () => {
+        if (!isPressed) return;
+        isPressed = false;
+        // 弹簧阻尼回弹
+        btn.animate([
+          { transform: btn.style.transform },
+          { transform: 'scale(1.08, 0.92)' },
+          { transform: 'scale(0.96, 1.04)' },
+          { transform: 'scale(1.02, 0.98)' },
+          { transform: 'scale(1, 1)' }
+        ], {
+          duration: 520,
+          easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)'
+        });
+        btn.style.transform = 'scale(1, 1)';
+      });
+    });
+
+    // --- 4. 实时控制面板绑定 ---
+    const sliderScale = document.getElementById('sliderScale');
+    const sliderRadius = document.getElementById('sliderRadius');
+    const sliderSize = document.getElementById('sliderSize');
+    const sliderBlur = document.getElementById('sliderBlur');
+
+    sliderScale.addEventListener('input', (e) => {
+      refractScale = parseInt(e.target.value);
+      document.getElementById('valScale').textContent = refractScale;
+      updateDisplacementMap();
+    });
+
+    sliderRadius.addEventListener('input', (e) => {
+      lensRadius = parseInt(e.target.value);
+      document.getElementById('valRadius').textContent = lensRadius + 'px';
+      glassLens.style.borderRadius = lensRadius + 'px';
+      updateDisplacementMap();
+    });
+
+    sliderSize.addEventListener('input', (e) => {
+      lensWidth = parseInt(e.target.value);
+      lensHeight = Math.round(lensWidth * 0.625);
+      document.getElementById('valSize').textContent = `${lensWidth} × ${lensHeight}`;
+      glassLens.style.width = lensWidth + 'px';
+      glassLens.style.height = lensHeight + 'px';
+      updateDisplacementMap();
+    });
+
+    sliderBlur.addEventListener('input', (e) => {
+      const b = parseFloat(e.target.value);
+      document.getElementById('valBlur').textContent = b + 'px';
+      document.documentElement.style.setProperty('--glass-blur', b + 'px');
+    });
+
+    // --- 5. 背景主题切换器 ---
+    const bgThemes = {
+      aurora: 'radial-gradient(circle at 20% 20%, #1e1b4b 0%, #0f172a 50%, #030712 100%)',
+      tang: 'radial-gradient(circle at 30% 20%, #451a03 0%, #291002 45%, #0c0401 100%)',
+      cyber: 'radial-gradient(circle at 70% 30%, #311042 0%, #180928 50%, #05010a 100%)',
+      minimal: 'linear-gradient(135deg, #090d16 0%, #111827 50%, #1f2937 100%)'
+    };
+
+    document.querySelectorAll('.bg-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.bg-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const themeKey = btn.dataset.bg;
+        document.body.style.background = bgThemes[themeKey];
+      });
+    });
+
+    // 初始化渲染首帧贴图
+    updateDisplacementMap();
+  </script>
+</body>
+</html>
